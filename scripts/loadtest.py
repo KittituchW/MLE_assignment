@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     env.update(
         {
             "PYTHONPATH": str(project / "src"),
-            "RECO_HOME": str((project / "var").resolve()),
+            "RECO_HOME": env.get("RECO_HOME", str((project / "var").resolve())),
             "OPENBLAS_NUM_THREADS": "1",
             "OMP_NUM_THREADS": "1",
         }

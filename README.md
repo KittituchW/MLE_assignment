@@ -172,7 +172,8 @@ The gate passed. Simulator output had 5,000 users, 205k events, median 29 events
 of items. The prepared catalogue had 31,991 unique items and 29,443 recommendable items after the reviewed policy.
 
 Tests: 28 passed with 83% coverage. Real HTTP sequential load check (300 requests): p50 5.121 ms, p95 5.799 ms, p99
-6.126 ms on this machine. Docker files were reviewed but **not executed** because Docker is unavailable here.
+6.126 ms on this machine. Docker files were reviewed but **not executed**; container execution was outside this
+environment's verified path.
 
 ## Tests and operational checks
 
