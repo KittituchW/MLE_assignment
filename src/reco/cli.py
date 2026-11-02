@@ -50,6 +50,27 @@ def _simulate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _train(args: argparse.Namespace) -> int:
+    from reco.bundle.pipeline import train_bundle
+
+    train_bundle(load_config(args.config), version=args.version)
+    return 0
+
+
+def _evaluate(args: argparse.Namespace) -> int:
+    from reco.bundle.pipeline import evaluate_bundle
+
+    evaluate_bundle(load_config(args.config), version=args.version)
+    return 0
+
+
+def _promote(args: argparse.Namespace) -> int:
+    from reco.bundle.registry import promote_bundle
+
+    promote_bundle(version=args.version, force=bool(args.version))
+    return 0
+
+
 def _common(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--config", default="configs/base.yaml")
 
@@ -66,11 +87,16 @@ def build_parser() -> argparse.ArgumentParser:
         ("validate", _validate, "run the raw data-quality gate"),
         ("prepare", _prepare, "create the canonical catalogue"),
         ("simulate", _simulate, "generate deterministic interactions"),
+        ("train", _train, "fit and write a portable candidate bundle"),
+        ("evaluate", _evaluate, "evaluate the candidate on the final temporal holdout"),
+        ("promote", _promote, "gate and promote the candidate, or roll back with --version"),
     ):
         subparser = commands.add_parser(name, help=help_text)
         _common(subparser)
+        if name in {"train", "evaluate", "promote"}:
+            subparser.add_argument("--version")
         subparser.set_defaults(func=func)
-    for name in ("train", "evaluate", "promote", "serve", "run-all"):
+    for name in ("serve", "run-all"):
         subparser = commands.add_parser(name)
         _common(subparser)
         subparser.set_defaults(func=_not_implemented)

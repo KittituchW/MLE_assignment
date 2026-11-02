@@ -1,4 +1,5 @@
 schema_version: 1
+build_date: "2026-11-02"
 as_of_date: "2026-01-31"
 seed: 42
 data:
@@ -38,4 +39,3 @@ serving:
   default_limit: 10
   diversity_fraction: 0.4
   pointer_poll_seconds: 5
-
