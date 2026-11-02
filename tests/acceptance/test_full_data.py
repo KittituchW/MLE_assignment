@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,7 @@ from reco.serving.app import create_app
 
 @pytest.mark.slow
 def test_assignment_given_when_then_on_full_bundle() -> None:
-    home = Path("var").resolve()
+    home = Path(os.environ.get("RECO_HOME", "var")).resolve()
     if not (home / "artifacts" / "CHAMPION").is_file():
         pytest.skip("run-all has not created the full-data champion")
     client = TestClient(create_app(home))
