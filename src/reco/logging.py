@@ -18,4 +18,3 @@ def configure_logging(level: str = "INFO") -> None:
 def request_log(**fields: Any) -> None:
     """Write the single structured exposure line required per API request."""
     logger.bind(event="recommendation_exposure").info(json.dumps(fields, separators=(",", ":"), default=str))
-

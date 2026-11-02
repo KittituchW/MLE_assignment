@@ -14,4 +14,3 @@ def test_runtime_paths(tmp_path: Path) -> None:
     paths = runtime_paths(tmp_path)
     assert paths["raw"].is_dir()
     assert paths["champion"] == tmp_path / "artifacts" / "CHAMPION"
-

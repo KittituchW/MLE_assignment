@@ -59,4 +59,3 @@ def runtime_paths(home: Path | None = None) -> dict[str, Path]:
     for key in ("raw", "processed", "interactions", "models"):
         paths[key].mkdir(parents=True, exist_ok=True)
     return paths
-
