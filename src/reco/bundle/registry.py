@@ -29,7 +29,15 @@ def _log_mlflow(bundle_path: Path, report: dict[str, Any], home: Path | None) ->
     tracking_uri = f"sqlite:///{paths['mlflow_db'].as_posix()}"
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_registry_uri(tracking_uri)
-    mlflow.set_experiment("netflix-reco")
+    client = MlflowClient(tracking_uri=tracking_uri, registry_uri=tracking_uri)
+    experiment = client.get_experiment_by_name("netflix-reco")
+    if experiment is None:
+        experiment_id = client.create_experiment(
+            "netflix-reco", artifact_location=(paths["home"] / "mlruns").resolve().as_uri()
+        )
+    else:
+        experiment_id = experiment.experiment_id
+    mlflow.set_experiment(experiment_id=experiment_id)
     with mlflow.start_run(run_name=str(bundle_path.name)):
         mlflow.log_params({"bundle_version": bundle_path.name, "interaction_source": "simulated"})
         for model_name, values in report["models"].items():
@@ -42,7 +50,6 @@ def _log_mlflow(bundle_path: Path, report: dict[str, Any], home: Path | None) ->
             artifacts={"portable_bundle": str(bundle_path)},
         )
     registered = mlflow.register_model(model_info.model_uri, "netflix-reco")
-    client = MlflowClient(tracking_uri=tracking_uri, registry_uri=tracking_uri)
     client.set_registered_model_alias("netflix-reco", "champion", registered.version)
     return str(registered.version)
 

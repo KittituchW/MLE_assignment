@@ -9,7 +9,7 @@ __pycache__/
 .coverage
 htmlcov/
 var/
+mlruns/
 dist/
 build/
 *.zip
-
