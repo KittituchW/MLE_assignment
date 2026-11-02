@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -71,6 +72,17 @@ def _promote(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve(args: argparse.Namespace) -> int:
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    import uvicorn
+
+    from reco.serving.app import create_app
+
+    uvicorn.run(create_app(), host=args.host, port=args.port, workers=1)
+    return 0
+
+
 def _common(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--config", default="configs/base.yaml")
 
@@ -96,7 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
         if name in {"train", "evaluate", "promote"}:
             subparser.add_argument("--version")
         subparser.set_defaults(func=func)
-    for name in ("serve", "run-all"):
+    serve_parser = commands.add_parser("serve", help="serve the promoted bundle")
+    _common(serve_parser)
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", default=8000, type=int)
+    serve_parser.set_defaults(func=_serve)
+    for name in ("run-all",):
         subparser = commands.add_parser(name)
         _common(subparser)
         subparser.set_defaults(func=_not_implemented)

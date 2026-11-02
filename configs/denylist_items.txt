@@ -1,3 +1,4 @@
 # One item_id per line. Reviewed additions should include a short reason.
 movie_104634  # Angels of Sex
-
+movie_829557  # 365 Days: This Day; removed during top-20 manual review
+movie_829560  # The Next 365 Days; removed during top-20 manual review

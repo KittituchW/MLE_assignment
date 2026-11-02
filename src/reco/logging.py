@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from typing import Any
 
@@ -17,4 +16,4 @@ def configure_logging(level: str = "INFO") -> None:
 
 def request_log(**fields: Any) -> None:
     """Write the single structured exposure line required per API request."""
-    logger.bind(event="recommendation_exposure").info(json.dumps(fields, separators=(",", ":"), default=str))
+    logger.bind(event="recommendation_exposure", **fields).info("recommendation_exposure")
