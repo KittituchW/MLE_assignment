@@ -1,0 +1,41 @@
+schema_version: 1
+as_of_date: "2026-01-31"
+seed: 42
+data:
+  repository_commit: "7e74398ef4d9fec262bd7f64573d4d2692db2ead"
+  movies:
+    filename: netflix_movies_detailed_up_to_2025.csv
+    url: https://raw.githubusercontent.com/pimphornm-pim/DSAssignmentDataSet/7e74398ef4d9fec262bd7f64573d4d2692db2ead/netflix_movies_detailed_up_to_2025.csv
+    sha256: 5439bcc05ccc4c170265a88e115891adecef64a330060dbd55266ac7fea14613
+  tv:
+    filename: netflix_tv_shows_detailed_up_to_2025.csv
+    url: https://raw.githubusercontent.com/pimphornm-pim/DSAssignmentDataSet/7e74398ef4d9fec262bd7f64573d4d2692db2ead/netflix_tv_shows_detailed_up_to_2025.csv
+    sha256: 16156fb21d0139a396b3a72cd58d66f86d272f7607df9281c2abfe68f59f80d7
+simulator:
+  users: 5000
+  event_window_days: 180
+  fixed_demo_events: 80
+  min_events: 5
+  max_events: 400
+  lognormal_mean: 3.4
+  lognormal_sigma: 0.8
+model:
+  name: hybrid
+  item_knn_neighbors: 100
+  content_components: 128
+  hybrid_weights:
+    item_knn: 0.6
+    content: 0.3
+    popularity: 0.1
+evaluation:
+  holdout_days: 14
+  validation_days: 14
+  max_users: 1500
+  k: 10
+  min_baseline_ratio: 1.5
+  champion_tolerance: 0.05
+serving:
+  default_limit: 10
+  diversity_fraction: 0.4
+  pointer_poll_seconds: 5
+

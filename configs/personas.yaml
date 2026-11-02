@@ -1,0 +1,31 @@
+action:
+  genres: {Action: 5, Adventure: 3, Thriller: 2, Science Fiction: 1}
+  language_boost: {}
+romance_kdrama:
+  genres: {Romance: 4, Drama: 3, Comedy: 1}
+  language_boost: {ko: 3}
+anime:
+  genres: {Animation: 5, Fantasy: 2, Action: 1}
+  language_boost: {ja: 4}
+family:
+  genres: {Family: 5, Animation: 3, Comedy: 2}
+  language_boost: {}
+horror:
+  genres: {Horror: 6, Thriller: 3, Mystery: 2}
+  language_boost: {}
+documentary:
+  genres: {Documentary: 6, History: 2, Politics: 1, News: 1}
+  language_boost: {}
+scifi:
+  genres: {Science Fiction: 5, Fantasy: 3, Adventure: 2}
+  language_boost: {}
+crime:
+  genres: {Crime: 5, Thriller: 3, Mystery: 3, Drama: 1}
+  language_boost: {}
+comedy:
+  genres: {Comedy: 6, Reality: 2, Talk: 1}
+  language_boost: {}
+drama:
+  genres: {Drama: 6, History: 1, War: 1}
+  language_boost: {}
+

@@ -1,0 +1,23 @@
+keywords:
+  - 'erotic\\w*'
+  - 'porn\\w*'
+  - softcore
+  - hentai
+  - 'adult film'
+  - 'nude\\w*'
+  - nudity
+  - orgy
+  - 'swinger\\w*'
+  - obscene
+  - busty
+  - bosomy
+  - 'step[- ]?(?:mother|sister|mom)'
+  - 'sister[- ]in[- ]law'
+  - 'mother[- ]in[- ]law'
+  - 'young (?:aunt|mother|wife|sister|stepmother)'
+evidence_floor:
+  content_type: movie
+  genres: [Romance, Drama]
+  max_vote_count: 49
+  budget: 0
+

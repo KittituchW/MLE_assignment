@@ -1,0 +1,8 @@
+defaults: base
+simulator:
+  users: 300
+model:
+  content_components: 32
+evaluation:
+  max_users: 300
+

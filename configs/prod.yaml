@@ -1,0 +1,4 @@
+defaults: base
+serving:
+  pointer_poll_seconds: 2
+
