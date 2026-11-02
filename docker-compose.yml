@@ -1,0 +1,41 @@
+services:
+  trainer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.train
+    environment:
+      RECO_HOME: /var/lib/reco
+    volumes:
+      - reco-data:/var/lib/reco
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.serve
+    environment:
+      RECO_HOME: /var/lib/reco
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    volumes:
+      - reco-data:/var/lib/reco:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.train
+    profiles: [observability]
+    command: ["mlflow", "server", "--backend-store-uri", "sqlite:////var/lib/reco/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+    volumes:
+      - reco-data:/var/lib/reco
+    ports:
+      - "5000:5000"
+
+volumes:
+  reco-data:
+

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
 from reco.bundle.reader import BundleData
 from reco.serving.ranking import rank_items
+
+Strategy = Literal["personalized", "content_based", "cold_start_popular", "degraded_popular"]
 
 
 def _minmax(values: np.ndarray) -> np.ndarray:
@@ -54,10 +56,11 @@ class RecommendationEngine:
 
     def recommend(
         self, user_id: str, limit: int = 10, content_type: str | None = None
-    ) -> tuple[str, list[dict[str, Any]]]:
+    ) -> tuple[Strategy, list[dict[str, Any]]]:
         """Score, apply ranking rules, and return strategy plus response item dictionaries."""
         user_index = self.user_index.get(user_id)
         watched: set[int] = set()
+        strategy: Strategy
         try:
             if user_index is None:
                 strategy = "cold_start_popular"

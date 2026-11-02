@@ -32,8 +32,9 @@ def rank_items(
     seen_titles: set[tuple[str, int]] = set()
     genre_counts: Counter[tuple[str, ...]] = Counter()
     genre_cap = max(1, int(np.floor(limit * 0.4)))
-    for item_index in candidates:
-        item = catalog[int(item_index)]
+    for candidate_index in candidates:
+        item_index = int(candidate_index)
+        item = catalog[item_index]
         title_key = (str(item["normalized_title"]), int(item["release_year"]))
         if title_key in seen_titles:
             continue
@@ -42,7 +43,7 @@ def rank_items(
             continue
         seen_titles.add(title_key)
         genre_counts[genre_key] += 1
-        result.append(int(item_index))
+        result.append(item_index)
         if len(result) == limit:
             break
     return result

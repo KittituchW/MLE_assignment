@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import socket
@@ -29,8 +30,12 @@ def _request(url: str, payload: dict | None = None) -> tuple[int, dict]:
         return exc.code, json.loads(exc.read())
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Run the smoke check."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--show-response", action="store_true")
+    args = parser.parse_args(argv)
     project = Path(__file__).parents[1]
     port = _port()
     env = dict(os.environ)
@@ -61,10 +66,19 @@ def main() -> int:
                 time.sleep(0.1)
         else:
             raise RuntimeError("uvicorn did not become ready")
-        status, body = _request(f"http://127.0.0.1:{port}/v1/recommendations", {"user_id": "A"})
-        if status != 200 or len(body.get("items", [])) != 10:
+        status, body = _request(f"http://127.0.0.1:{port}/v1/recommendations", {"user_id": "A", "limit": args.limit})
+        if status != 200 or len(body.get("items", [])) != args.limit:
             raise RuntimeError(f"smoke request failed: status={status} body={body}")
-        print(json.dumps({"status": "ok", "strategy": body["strategy"], "model_version": body["model_version"]}))
+        output = (
+            body
+            if args.show_response
+            else {
+                "status": "ok",
+                "strategy": body["strategy"],
+                "model_version": body["model_version"],
+            }
+        )
+        print(json.dumps(output, ensure_ascii=False))
         return 0
     finally:
         process.terminate()

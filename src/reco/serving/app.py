@@ -13,7 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from reco.logging import request_log
 from reco.serving.metrics import ApiMetrics
-from reco.serving.schemas import RecommendationRequest, RecommendationResponse
+from reco.serving.schemas import RecommendationRequest, RecommendationResponse, RecommendedItem
 from reco.serving.store import BundleStore
 
 
@@ -81,7 +81,7 @@ def create_app(home: Path | None = None) -> FastAPI:
             user_id=request.user_id,
             strategy=strategy,
             model_version=version,
-            items=items,
+            items=[RecommendedItem(**item) for item in items],
         )
 
     return app

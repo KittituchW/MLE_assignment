@@ -28,11 +28,18 @@ def load_config(path: str | Path | None = None) -> DictConfig:
     config_path = Path(path) if path else project_root() / "configs" / "base.yaml"
     if not config_path.is_absolute():
         config_path = (project_root() / config_path).resolve()
-    cfg = OmegaConf.load(config_path)
-    parent = cfg.pop("defaults", None)
+    loaded = OmegaConf.load(config_path)
+    if not isinstance(loaded, DictConfig):
+        raise TypeError(f"Expected mapping configuration: {config_path}")
+    cfg = loaded
+    parent = cfg.get("defaults")
     if parent:
+        del cfg["defaults"]
         parent_path = config_path.with_name(f"{parent}.yaml")
-        cfg = OmegaConf.merge(OmegaConf.load(parent_path), cfg)
+        merged = OmegaConf.merge(OmegaConf.load(parent_path), cfg)
+        if not isinstance(merged, DictConfig):
+            raise TypeError(f"Expected merged mapping configuration: {config_path}")
+        cfg = merged
     OmegaConf.resolve(cfg)
     return cfg
 

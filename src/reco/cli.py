@@ -83,6 +83,32 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_all(args: argparse.Namespace) -> int:
+    """Run the ordered, fail-fast training pipeline."""
+    cfg = load_config(args.config)
+    from reco.bundle.pipeline import evaluate_bundle, train_bundle
+    from reco.bundle.registry import promote_bundle
+    from reco.data.ingest import ingest
+    from reco.data.prepare import prepare
+    from reco.data.validate import validate
+    from reco.interactions.simulator import SimulatedInteractionSource, write_simulated
+
+    ingest(cfg, source=args.source)
+    validate(cfg)
+    catalog_path = prepare(cfg)
+    import pandas as pd
+
+    paths = runtime_paths()
+    write_simulated(
+        SimulatedInteractionSource(pd.read_parquet(catalog_path), cfg),
+        paths["interactions"] / "interactions.parquet",
+    )
+    bundle = train_bundle(cfg, version=args.version)
+    evaluate_bundle(cfg, version=bundle.name)
+    promote_bundle(version=bundle.name)
+    return 0
+
+
 def _common(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--config", default="configs/base.yaml")
 
@@ -113,10 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", default=8000, type=int)
     serve_parser.set_defaults(func=_serve)
-    for name in ("run-all",):
-        subparser = commands.add_parser(name)
-        _common(subparser)
-        subparser.set_defaults(func=_not_implemented)
+    run_all = commands.add_parser("run-all", help="run ingest through promotion")
+    _common(run_all)
+    run_all.add_argument("--source", type=Path)
+    run_all.add_argument("--version")
+    run_all.set_defaults(func=_run_all)
     return parser
 
 

@@ -9,8 +9,10 @@ jobs:
         with: {python-version: "3.12", cache: pip}
       - run: pip install --use-feature=truststore -e '.[dev]'
       - run: ruff check .
+      - run: ruff format --check .
       - run: mypy src/reco
       - run: pytest --cov=reco --cov-report=term-missing
       - name: Reject non-deterministic pipeline clocks
         run: '! grep -R "datetime\.now" src/reco --exclude=logging.py'
       - run: docker build -f docker/Dockerfile.serve .
+      - run: docker build -f docker/Dockerfile.train .

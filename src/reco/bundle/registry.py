@@ -19,7 +19,7 @@ def _log_mlflow(bundle_path: Path, report: dict[str, Any], home: Path | None) ->
     import mlflow
     from mlflow import MlflowClient
 
-    class BundleReferenceModel(mlflow.pyfunc.PythonModel):
+    class BundleReferenceModel(mlflow.pyfunc.PythonModel):  # type: ignore[name-defined]
         """Registry placeholder; production serving reads the logged portable bundle directly."""
 
         def predict(self, context: Any, model_input: Any, params: Any = None) -> Any:
