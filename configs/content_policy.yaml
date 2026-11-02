@@ -1,13 +1,13 @@
 keywords:
-  - 'erotic\\w*'
-  - 'porn\\w*'
+  - 'erotic\w*'
+  - 'porn\w*'
   - softcore
   - hentai
   - 'adult film'
-  - 'nude\\w*'
+  - 'nude\w*'
   - nudity
   - orgy
-  - 'swinger\\w*'
+  - 'swinger\w*'
   - obscene
   - busty
   - bosomy
@@ -20,4 +20,3 @@ evidence_floor:
   genres: [Romance, Drama]
   max_vote_count: 49
   budget: 0
-
