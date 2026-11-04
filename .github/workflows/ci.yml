@@ -16,6 +16,14 @@ jobs:
         run: '! grep -R "datetime\.now" src/reco --exclude=logging.py'
       - run: docker build -t netflix-reco-serve-ci -f docker/Dockerfile.serve .
       - run: docker build -t netflix-reco-train-ci -f docker/Dockerfile.train .
+      - name: Full-data training and assignment acceptance
+        env:
+          RECO_HOME: /tmp/netflix-reco-full-acceptance
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+        run: |
+          python -m reco run-all
+          pytest -m slow -rs
       - name: Dockerized fixture pipeline and API smoke test
         run: |
           set -euo pipefail
