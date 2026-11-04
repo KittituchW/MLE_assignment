@@ -135,7 +135,8 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.add_argument("--version")
         if name == "promote":
             subparser.add_argument(
-                "--force", action="store_true",
+                "--force",
+                action="store_true",
                 help="Explicitly bypass the quality gate for a trusted rollback or test fixture",
             )
         subparser.set_defaults(func=func)
