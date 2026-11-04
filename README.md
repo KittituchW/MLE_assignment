@@ -127,7 +127,7 @@ curl -sS -X POST http://127.0.0.1:8000/v1/recommendations \
   -d '{"user_id":"A","limit":3}'
 ```
 
-Captured from the running uvicorn service on 2026-11-02 (the request ID is different on every call):
+Illustrative response structure (request IDs, model versions, rankings and scores vary with each run):
 
 ```json
 {
@@ -144,7 +144,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Thriller"],
       "release_year": 2022,
       "score": 0.592537,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     },
     {
       "rank": 2,
@@ -154,7 +154,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Fantasy"],
       "release_year": 2018,
       "score": 0.569779,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     },
     {
       "rank": 3,
@@ -164,7 +164,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Science Fiction"],
       "release_year": 2018,
       "score": 0.551833,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     }
   ]
 }
