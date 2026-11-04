@@ -77,7 +77,8 @@ flowchart TD
 ```
 
 - A corrupt hot-swap target is rejected and cached as failed for the current pointer value; the old in-memory model
-  continues serving. Model and version are read as a matching snapshot.
+  continues serving. Pointer reads are throttled and an independent, non-blocking load lock prevents concurrent reloads.
+  The new bundle is loaded outside the state lock; model and version are swapped as one matching snapshot.
 - Feature-store timeout uses a bounded stale value, then market popular; the response records degradation.
 - ANN failure uses cached/precomputed candidates. Policy/rights failure is fail-closed for restricted content.
 - Registry/lakehouse outages stop promotion but do not affect the current serving bundle.
@@ -89,9 +90,10 @@ Proposed availability SLO: 99.9% monthly for recommendations, with `/healthz` ex
 available. Latency SLO: p95 <100 ms and p99 <200 ms at the gateway. Freshness: 99% of accepted behavior appears in online
 features within 60 seconds; champion age under seven days unless promotion is intentionally frozen.
 
-The earlier local sequential HTTP test reported p95 5.799 ms under a single-client workload. That figure is **not**
-a concurrency or throughput benchmark and should not be used to size production replicas. Before capacity planning,
-run concurrent traffic tests with realistic history lengths and the full catalogue, including simultaneous hot swaps.
+A sequential single-client HTTP latency sample does **not** establish production capacity or concurrency performance.
+Before capacity planning, benchmark concurrent traffic with realistic history lengths and the full catalogue,
+including simultaneous hot swaps. Hot-swap regression tests specifically verify that an existing engine can serve
+requests while a replacement bundle loads.
 
 ## Monitoring
 
