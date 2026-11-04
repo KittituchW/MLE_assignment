@@ -58,6 +58,26 @@ python -m reco promote
 python -m reco promote --version 20261102-abc1234  # explicit rollback
 ```
 
+## Docker quickstart
+
+Docker Compose runs training first, saves its model artifacts in a persistent named volume, and then starts the API:
+
+```bash
+docker compose up --build
+curl -fsS http://localhost:8000/readyz
+curl -fsS -X POST http://localhost:8000/v1/recommendations \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"A","limit":3}'
+```
+
+The trainer downloads the pinned source CSV files on the first run, so outbound access to GitHub is required. The
+container sets `RECO_PROJECT_ROOT=/app` to find its config files after a non-editable pip install. A source commit can
+optionally be supplied with `RECO_GIT_SHA`; without Git metadata, the manifest records `unknown`. Use
+`docker compose down` to stop the services; `docker compose down -v` also deletes the trained artifacts.
+
+CI runs a containerized end-to-end smoke test using the committed 300-item fixture and verifies the API over HTTP.
+This is separate from the full-data evaluation reported below.
+
 ## How does it work
 
 ```mermaid
@@ -172,8 +192,8 @@ The gate passed. Simulator output had 5,000 users, 205k events, median 29 events
 of items. The prepared catalogue had 31,991 unique items and 29,443 recommendable items after the reviewed policy.
 
 Tests: 28 passed with 83% coverage. Real HTTP sequential load check (300 requests): p50 5.121 ms, p95 5.799 ms, p99
-6.126 ms on this machine. Docker files were reviewed but **not executed**; container execution was outside this
-environment's verified path.
+6.126 ms on this machine. The earlier local run did not execute Docker; the GitHub Actions workflow now includes a containerized fixture
+pipeline and API smoke test. The full-data Docker Compose flow remains a separate manual check.
 
 ## Tests and operational checks
 

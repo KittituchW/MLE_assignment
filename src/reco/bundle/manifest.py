@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -13,16 +14,22 @@ SCHEMA_VERSION = 1
 
 
 def git_sha(project: Path) -> str:
-    """Return the current repository SHA, or ``unknown`` outside Git."""
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=project,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    return result.stdout.strip() if result.returncode == 0 else "unknown"
+    """Return an explicit source SHA or Git SHA, falling back safely outside Git."""
+    configured = os.environ.get("RECO_GIT_SHA", "").strip()
+    if configured:
+        return configured
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "unknown"
+    return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else "unknown"
 
 
 def make_version(cfg: Any, project: Path) -> str:

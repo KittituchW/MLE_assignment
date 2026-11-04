@@ -12,7 +12,10 @@ from omegaconf import DictConfig, OmegaConf
 
 
 def project_root() -> Path:
-    """Return the repository root independent of the current directory."""
+    """Resolve the root in either a source checkout or an installed container package."""
+    configured = os.environ.get("RECO_PROJECT_ROOT")
+    if configured:
+        return Path(configured).expanduser().resolve()
     return Path(__file__).resolve().parents[2]
 
 
