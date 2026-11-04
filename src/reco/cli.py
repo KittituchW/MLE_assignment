@@ -68,7 +68,7 @@ def _evaluate(args: argparse.Namespace) -> int:
 def _promote(args: argparse.Namespace) -> int:
     from reco.bundle.registry import promote_bundle
 
-    promote_bundle(version=args.version, force=bool(args.version))
+    promote_bundle(version=args.version, force=args.force)
     return 0
 
 
@@ -127,12 +127,18 @@ def build_parser() -> argparse.ArgumentParser:
         ("simulate", _simulate, "generate deterministic interactions"),
         ("train", _train, "fit and write a portable candidate bundle"),
         ("evaluate", _evaluate, "evaluate the candidate on the final temporal holdout"),
-        ("promote", _promote, "gate and promote the candidate, or roll back with --version"),
+        ("promote", _promote, "gate and promote a candidate; override only with explicit --force"),
     ):
         subparser = commands.add_parser(name, help=help_text)
         _common(subparser)
         if name in {"train", "evaluate", "promote"}:
             subparser.add_argument("--version")
+        if name == "promote":
+            subparser.add_argument(
+                "--force",
+                action="store_true",
+                help="Explicitly bypass the quality gate for a trusted rollback or test fixture",
+            )
         subparser.set_defaults(func=func)
     serve_parser = commands.add_parser("serve", help="serve the promoted bundle")
     _common(serve_parser)

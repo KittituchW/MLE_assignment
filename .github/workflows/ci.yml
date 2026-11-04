@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install --use-feature=truststore -e '.[dev]'
+      - run: pip install -e '.[dev]'
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy src/reco
@@ -16,6 +16,14 @@ jobs:
         run: '! grep -R "datetime\.now" src/reco --exclude=logging.py'
       - run: docker build -t netflix-reco-serve-ci -f docker/Dockerfile.serve .
       - run: docker build -t netflix-reco-train-ci -f docker/Dockerfile.train .
+      - name: Full-data training and assignment acceptance
+        env:
+          RECO_HOME: /tmp/netflix-reco-full-acceptance
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+        run: |
+          python -m reco run-all
+          pytest -m slow -rs
       - name: Dockerized fixture pipeline and API smoke test
         run: |
           set -euo pipefail
@@ -34,7 +42,7 @@ jobs:
               python -m reco train --config configs/ci.yaml --version fixture-ci
               python -m reco evaluate --config configs/ci.yaml --version fixture-ci
               # Small fixture metrics are not meaningful: force only for this CI smoke.
-              python -m reco promote --config configs/ci.yaml --version fixture-ci
+              python -m reco promote --config configs/ci.yaml --version fixture-ci --force
             '
 
           docker run -d --name netflix-reco-ci-api \

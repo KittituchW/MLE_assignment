@@ -12,12 +12,12 @@ from FastAPI.
 
 Python 3.12 is required. The main path does not require Docker, Make, Conda, or `uv`.
 
-Windows PowerShell (recommended on the assignment machine):
+Windows PowerShell:
 
 ```powershell
 py -3.12 -m venv "$env:LOCALAPPDATA\venvs\netflix-reco"
 & "$env:LOCALAPPDATA\venvs\netflix-reco\Scripts\Activate.ps1"
-python -m pip install --use-feature=truststore -e ".[dev]"
+python -m pip install -e ".[dev]"
 $env:RECO_HOME = "$env:LOCALAPPDATA\netflix-reco"
 $env:OPENBLAS_NUM_THREADS = "1"
 $env:OMP_NUM_THREADS = "1"
@@ -55,7 +55,8 @@ python -m reco simulate
 python -m reco train
 python -m reco evaluate
 python -m reco promote
-python -m reco promote --version 20261102-abc1234  # explicit rollback
+python -m reco promote --version 20261102-abc1234  # still checks the quality gate
+python -m reco promote --version 20261102-abc1234 --force  # explicit trusted rollback only
 ```
 
 ## Docker quickstart
@@ -75,8 +76,11 @@ container sets `RECO_PROJECT_ROOT=/app` to find its config files after a non-edi
 optionally be supplied with `RECO_GIT_SHA`; without Git metadata, the manifest records `unknown`. Use
 `docker compose down` to stop the services; `docker compose down -v` also deletes the trained artifacts.
 
-CI runs a containerized end-to-end smoke test using the committed 300-item fixture and verifies the API over HTTP.
-This is separate from the full-data evaluation reported below.
+CI trains on the committed 300-item fixture in containers and verifies the API over HTTP.
+The full-data acceptance check uses a separate fresh run to avoid relying on saved local artifacts.
+The demonstration endpoint is **unauthenticated** and must not be exposed to the public internet; put a
+gateway with authentication, authorization, and user-to-token identity binding in front of any real deployment.
+Docker Compose binds API and optional MLflow ports to localhost only.
 
 ## How does it work
 
@@ -105,7 +109,9 @@ flowchart LR
 
 The primary signal is item-kNN over watch-weighted behavior. A compact TF-IDF/SVD model reaches items with no training
 events; it is included for catalogue reach, not because it wins offline accuracy. Popularity handles unknown users and
-degraded requests. The API holds one read-only bundle in memory, fully validates a newly promoted bundle before swapping
+degraded requests. The serving weights and diversity fraction are saved in the model manifest. Offline hybrid evaluation
+uses the same model selection, exclusion, deduplication, and diversity rules as the API; the gate should be assessed on
+the **served list**, not just an unrestricted score list. The API holds one read-only bundle in memory, fully validates a newly promoted bundle before swapping
 the reference, and keeps serving the previous version after a failed reload.
 
 The API process never imports pandas, scikit-learn, or MLflow and never loads pickle. The MLflow registry wrapper may use
@@ -121,7 +127,7 @@ curl -sS -X POST http://127.0.0.1:8000/v1/recommendations \
   -d '{"user_id":"A","limit":3}'
 ```
 
-Captured from the running uvicorn service on 2026-11-02 (the request ID is different on every call):
+Illustrative response structure (request IDs, model versions, rankings and scores vary with each run):
 
 ```json
 {
@@ -138,7 +144,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Thriller"],
       "release_year": 2022,
       "score": 0.592537,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     },
     {
       "rank": 2,
@@ -148,7 +154,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Fantasy"],
       "release_year": 2018,
       "score": 0.569779,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     },
     {
       "rank": 3,
@@ -158,7 +164,7 @@ Captured from the running uvicorn service on 2026-11-02 (the request ID is diffe
       "genres": ["Action", "Adventure", "Science Fiction"],
       "release_year": 2018,
       "score": 0.551833,
-      "reason": "Because you watched Golden Kamuy"
+      "reason": "Based on your viewing preferences"
     }
   ]
 }
@@ -175,25 +181,20 @@ Optional request fields are `limit` (1-50, default 10) and `content_type` (`movi
 | `GET /v1/model` | Active bundle manifest and provenance |
 
 One structured JSON exposure line is logged per successful request with request ID, user ID, model version, strategy,
-and returned item IDs.
+and returned item IDs. User IDs and exposure logs should be pseudonymized and access-controlled in a real service.
+The demo response uses generic preference explanations rather than disclosing watched titles.
 
-## Measured results
+## Evaluation and verification
 
-Full 2026-11-02 run, seed 42, 1,500 test users, final 14-day temporal holdout:
+The source dataset has no real user interactions. Offline Recall@10, NDCG@10, catalogue coverage and cold-item share
+are measured on reproducibly simulated behavior, so these are **regression diagnostics**, not real-world effectiveness.
+Earlier results are deliberately not reproduced here: scoring and post-ranking rules were aligned after that run, and
+the old figures would no longer describe the current serving contract.
 
-| Model | Recall@10 | NDCG@10 | Coverage | Cold-item share |
-|---|---:|---:|---:|---:|
-| Popularity | 0.0193 | 0.0120 | 0.07% | 0.00% |
-| Item-kNN | 0.0448 | 0.0345 | 6.20% | 0.00% |
-| Content | 0.0030 | 0.0018 | 7.14% | 62.17% |
-| **Hybrid** | **0.0499** | **0.0362** | **5.62%** | **0.02%** |
-
-The gate passed. Simulator output had 5,000 users, 205k events, median 29 events/user, and 17.1% of events on the top 1%
-of items. The prepared catalogue had 31,991 unique items and 29,443 recommendable items after the reviewed policy.
-
-Tests: 28 passed with 83% coverage. Real HTTP sequential load check (300 requests): p50 5.121 ms, p95 5.799 ms, p99
-6.126 ms on this machine. The earlier local run did not execute Docker; the GitHub Actions workflow now includes a containerized fixture
-pipeline and API smoke test. The full-data Docker Compose flow remains a separate manual check.
+The CI workflow checks formatting, lint, types, tests, Docker image builds and a containerized training/API smoke test
+on the 300-item fixture. To validate full-data results after a fresh clone, run `python -m reco run-all`, followed by
+`pytest -m slow -rs`, and inspect the emitted `eval_report.json` under `RECO_HOME/artifacts/models`.
+The full-data training gate is meaningful only when it completes without `--force`.
 
 ## Tests and operational checks
 
@@ -218,6 +219,9 @@ cross-file collision. Raw full data, runtime artifacts, databases, and virtual e
   needs licensed maturity and territory-rights data.
 - Popularity is a catalogue snapshot with a strong recency bias and different movie/TV scales.
 - Content embeddings are English-token oriented, and descriptions are missing for many titles.
+- The served model uses a pre-test training snapshot, excluding the final test window. A future production pipeline
+  should refit an approved configuration on all eligible recent history and retain the evaluation lineage. Real-time
+  interaction ingestion is not implemented.
 - Single-process scoring is intentional for the assignment. Horizontal production scale is described in
   `docs/architecture.md`.
 

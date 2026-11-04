@@ -53,3 +53,13 @@ def test_scoring_exception_degrades_to_popularity(monkeypatch) -> None:
     strategy, items = engine.recommend("A", limit=2)
     assert strategy == "degraded_popular"
     assert items
+
+
+def test_manifest_weights_drive_serving() -> None:
+    engine = _engine(sparse.csr_matrix([[1, 1, 1, 0, 0, 0]], dtype=np.float32))
+    engine.bundle.manifest["serving"] = {"hybrid_weights": [0.0, 0.0, 1.0]}
+    from reco.serving.engine import RecommendationEngine
+
+    configured = RecommendationEngine(engine.bundle)
+    assert configured.weights == (0.0, 0.0, 1.0)
+    assert np.allclose(configured._personalized(0), configured._popularity())

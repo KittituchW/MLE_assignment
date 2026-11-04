@@ -18,13 +18,15 @@ class TemporalSplit:
     test_start: pd.Timestamp
 
 
-def temporal_split(interactions: pd.DataFrame, as_of_date: str, window_days: int = 14) -> TemporalSplit:
+def temporal_split(
+    interactions: pd.DataFrame, as_of_date: str, window_days: int = 14, validation_days: int | None = None
+) -> TemporalSplit:
     """Reserve two final windows, and remove already-seen targets per user."""
     events = interactions.copy()
     events["event_ts"] = pd.to_datetime(events.event_ts, utc=True)
     as_of = pd.Timestamp(as_of_date, tz="UTC")
     test_start = as_of - pd.Timedelta(days=window_days)
-    validation_start = test_start - pd.Timedelta(days=window_days)
+    validation_start = test_start - pd.Timedelta(days=validation_days if validation_days is not None else window_days)
     train = events.loc[events.event_ts < validation_start].copy()
     validation = events.loc[(events.event_ts >= validation_start) & (events.event_ts < test_start)].copy()
     test = events.loc[(events.event_ts >= test_start) & (events.event_ts <= as_of)].copy()

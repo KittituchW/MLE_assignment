@@ -7,18 +7,8 @@ import pandas as pd
 
 from reco.evaluation.metrics import catalogue_coverage, ndcg_at_k, recall_at_k
 from reco.models.training import TrainedModels
-
-
-def _top_k(scores: np.ndarray, eligible: np.ndarray, watched: np.ndarray, k: int) -> list[int]:
-    values = np.asarray(scores, dtype=np.float32).copy()
-    values[~eligible] = -np.inf
-    values[watched] = -np.inf
-    available = int(np.isfinite(values).sum())
-    if available == 0:
-        return []
-    count = min(k, available)
-    candidates = np.argpartition(values, -count)[-count:]
-    return candidates[np.argsort(values[candidates])[::-1]].tolist()
+from reco.serving.engine import RecommendationEngine
+from reco.serving.ranking import rank_items
 
 
 def evaluate_models(
@@ -26,6 +16,9 @@ def evaluate_models(
     test: pd.DataFrame,
     max_users: int = 1500,
     k: int = 10,
+    *,
+    serving_engine: RecommendationEngine | None = None,
+    diversity_fraction: float = 0.4,
 ) -> dict[str, dict[str, float]]:
     """Evaluate each model on new-to-user temporal targets."""
     item_index = {item: index for index, item in enumerate(trained.item_ids)}
@@ -33,6 +26,7 @@ def evaluate_models(
     grouped = {str(user): set(group.item_id.astype(str)) & set(item_index) for user, group in test.groupby("user_id")}
     users = [user for user in sorted(grouped) if user in user_index and grouped[user]][:max_users]
     eligible = trained.catalog.recommendable.to_numpy(dtype=bool)
+    catalog = trained.catalog.to_dict("records")
     training_items = set(np.flatnonzero(np.asarray(trained.history.getnnz(axis=0)).ravel() > 0).tolist())
     results: dict[str, dict[str, float]] = {}
     for model_name, model in trained.models.items():
@@ -44,7 +38,17 @@ def evaluate_models(
         for user in users:
             index = user_index[user]
             watched = trained.history.getrow(index).indices
-            ranked = _top_k(model.score(index), eligible, watched, k)
+            if model_name == "hybrid" and serving_engine is not None:
+                _, served_items = serving_engine.recommend(user, limit=k)
+                ranked = [item_index[item["item_id"]] for item in served_items]
+            else:
+                ranked = rank_items(
+                    model.score(index),
+                    catalog,
+                    set(int(item) for item in watched),
+                    k,
+                    diversity_fraction=diversity_fraction,
+                )
             recommended = [trained.item_ids[item] for item in ranked]
             relevant = grouped[user]
             recalls.append(recall_at_k(recommended, relevant, k))

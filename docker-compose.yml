@@ -19,7 +19,7 @@ services:
     volumes:
       - reco-data:/var/lib/reco:ro
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       trainer:
         condition: service_completed_successfully
@@ -34,7 +34,7 @@ services:
     volumes:
       - reco-data:/var/lib/reco
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
 
 volumes:
   reco-data:

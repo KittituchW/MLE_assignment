@@ -38,4 +38,3 @@ evaluation:
 serving:
   default_limit: 10
   diversity_fraction: 0.4
-  pointer_poll_seconds: 5

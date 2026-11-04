@@ -14,6 +14,8 @@ def rank_items(
     watched: set[int],
     limit: int,
     content_type: str | None = None,
+    *,
+    diversity_fraction: float = 0.4,
 ) -> list[int]:
     """Apply eligibility, history, filter, duplicate, and diversity rules before cutting to ``limit``."""
     values = np.asarray(scores, dtype=np.float32)
@@ -31,7 +33,9 @@ def rank_items(
     result: list[int] = []
     seen_titles: set[tuple[str, int]] = set()
     genre_counts: Counter[tuple[str, ...]] = Counter()
-    genre_cap = max(1, int(np.floor(limit * 0.4)))
+    if not 0 < diversity_fraction <= 1:
+        raise ValueError("diversity_fraction must be in (0, 1]")
+    genre_cap = max(1, int(np.floor(limit * diversity_fraction)))
     for candidate_index in candidates:
         item_index = int(candidate_index)
         item = catalog[item_index]

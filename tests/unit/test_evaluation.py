@@ -54,3 +54,16 @@ def test_gate_checks_baseline_and_champion() -> None:
     passed, reasons = evaluate_gate({"recall_at_10": 0.014, "ndcg_at_10": 0.03}, baseline, champion)
     assert not passed
     assert any("recall" in reason for reason in reasons)
+
+
+def test_temporal_split_has_independent_validation_window() -> None:
+    events = pd.DataFrame(
+        {
+            "user_id": ["u"] * 3,
+            "item_id": ["train", "validation", "test"],
+            "event_ts": pd.to_datetime(["2026-01-01", "2026-01-15", "2026-01-27"], utc=True),
+        }
+    )
+    split = temporal_split(events, "2026-01-31", window_days=7, validation_days=14)
+    assert split.validation_start == pd.Timestamp("2026-01-10", tz="UTC")
+    assert len(split.train) == len(split.validation) == len(split.test) == 1

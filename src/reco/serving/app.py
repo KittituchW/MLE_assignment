@@ -38,9 +38,10 @@ def create_app(home: Path | None = None) -> FastAPI:
     @app.get("/readyz")
     def readyz() -> dict[str, Any]:
         store.reload_if_changed()
-        if store.get() is None:
-            raise HTTPException(status_code=503, detail={"status": "not_ready", "error": store.error})
-        return {"status": "ready", "model_version": store.version}
+        engine, version = store.snapshot()
+        if engine is None:
+            raise HTTPException(status_code=503, detail={"status": "not_ready"})
+        return {"status": "ready", "model_version": version}
 
     @app.get("/metrics")
     def prometheus_metrics() -> Response:
@@ -49,7 +50,7 @@ def create_app(home: Path | None = None) -> FastAPI:
     @app.get("/v1/model")
     def model_manifest() -> dict[str, Any]:
         store.reload_if_changed()
-        engine = store.get()
+        engine, _ = store.snapshot()
         if engine is None:
             raise HTTPException(status_code=503, detail="Model bundle is not loaded")
         return engine.bundle.manifest
@@ -59,12 +60,12 @@ def create_app(home: Path | None = None) -> FastAPI:
         started = time.perf_counter()
         request_id = uuid.uuid4().hex
         store.reload_if_changed()
-        engine = store.get()
+        engine, version = store.snapshot()
         if engine is None:
             metrics.requests.labels(status="503").inc()
             raise HTTPException(status_code=503, detail="Model bundle is not loaded")
         strategy, items = engine.recommend(request.user_id, request.limit, request.content_type)
-        version = store.version or "unknown"
+        version = version or "unknown"
         metrics.requests.labels(status="200").inc()
         metrics.strategies.labels(strategy=strategy).inc()
         metrics.model_version.labels(version=version).set(1)

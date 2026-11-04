@@ -85,3 +85,17 @@ def test_failed_gate_leaves_champion_and_rollback_works(tmp_path: Path) -> None:
     assert champion.read_text().strip() == "v2"
     promote_bundle(tmp_path, "v1", track_mlflow=False, force=True)
     assert champion.read_text().strip() == "v1"
+
+
+def test_explicit_candidate_version_does_not_bypass_gate(tmp_path: Path, monkeypatch) -> None:
+    from argparse import Namespace
+
+    from reco.cli import _promote
+
+    data = tmp_path / "input.bin"
+    data.write_text("x", encoding="utf-8")
+    candidate = write_bundle(_trained(), load_config(), "rejected", [data], tmp_path)
+    update_evaluation(candidate, _report(0.0, passed=False))
+    monkeypatch.setenv("RECO_HOME", str(tmp_path))
+    with pytest.raises(PromotionRejected):
+        _promote(Namespace(version="rejected", force=False))
