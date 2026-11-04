@@ -65,7 +65,14 @@ def reconstruct(bundle: BundleData, cfg: Any) -> TrainedModels:
             float(cfg.model.hybrid_weights.popularity),
         ],
     )
-    hybrid = HybridRecommender(knn_model, content_model, pop_model, tuple(float(w) for w in weights))
+    if len(weights) != 3:
+        raise ValueError("Stored hybrid weights must contain exactly three values")
+    hybrid = HybridRecommender(
+        knn_model,
+        content_model,
+        pop_model,
+        (float(weights[0]), float(weights[1]), float(weights[2])),
+    )
     return TrainedModels(
         catalog,
         bundle.item_ids,
