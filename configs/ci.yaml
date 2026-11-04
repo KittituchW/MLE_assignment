@@ -1,0 +1,16 @@
+# Small, checked-in real catalogue fixture used by the container smoke test.
+defaults: base
+data:
+  movies:
+    sha256: 72cf650bc9f3f1e01fb29ec5b069720e3ed93920ed803314a4022a67527c5b8a
+  tv:
+    sha256: 636e663e119792b58c1710c469b8627d5ccd1e75d731b0723ad934a5c38e7b50
+simulator:
+  users: 30
+  fixed_demo_events: 20
+  max_events: 50
+model:
+  item_knn_neighbors: 10
+  content_components: 16
+evaluation:
+  max_users: 20

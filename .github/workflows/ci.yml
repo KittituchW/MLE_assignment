@@ -14,5 +14,40 @@ jobs:
       - run: pytest --cov=reco --cov-report=term-missing
       - name: Reject non-deterministic pipeline clocks
         run: '! grep -R "datetime\.now" src/reco --exclude=logging.py'
-      - run: docker build -f docker/Dockerfile.serve .
-      - run: docker build -f docker/Dockerfile.train .
+      - run: docker build -t netflix-reco-serve-ci -f docker/Dockerfile.serve .
+      - run: docker build -t netflix-reco-train-ci -f docker/Dockerfile.train .
+      - name: Dockerized fixture pipeline and API smoke test
+        run: |
+          set -euo pipefail
+          docker volume create netflix-reco-ci
+          trap 'docker rm -f netflix-reco-ci-api 2>/dev/null || true; docker volume rm netflix-reco-ci 2>/dev/null || true' EXIT
+
+          docker run --rm \
+            -v netflix-reco-ci:/var/lib/reco \
+            -v "$PWD/tests/fixtures/raw:/fixtures:ro" \
+            netflix-reco-train-ci \
+            sh -ec '
+              python -m reco ingest --config configs/ci.yaml --source /fixtures
+              python -m reco validate --config configs/ci.yaml
+              python -m reco prepare --config configs/ci.yaml
+              python -m reco simulate --config configs/ci.yaml
+              python -m reco train --config configs/ci.yaml --version fixture-ci
+              python -m reco evaluate --config configs/ci.yaml --version fixture-ci
+              # Small fixture metrics are not meaningful: force only for this CI smoke.
+              python -m reco promote --config configs/ci.yaml --version fixture-ci
+            '
+
+          docker run -d --name netflix-reco-ci-api \
+            -p 127.0.0.1:18080:8000 \
+            -v netflix-reco-ci:/var/lib/reco:ro \
+            netflix-reco-serve-ci
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/readyz > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/readyz
+          curl -fsS -X POST http://127.0.0.1:18080/v1/recommendations \
+            -H 'Content-Type: application/json' \
+            -d '{"user_id":"A","limit":3}' \
+            | python -c 'import json,sys; data=json.load(sys.stdin); assert data["strategy"] == "personalized"; assert len(data["items"]) == 3'
