@@ -15,6 +15,7 @@ def test_runtime_paths(tmp_path: Path) -> None:
     assert paths["raw"].is_dir()
     assert paths["champion"] == tmp_path / "artifacts" / "CHAMPION"
 
+
 def test_project_root_override_loads_container_config(tmp_path: Path, monkeypatch) -> None:
     configs = tmp_path / "configs"
     configs.mkdir()
