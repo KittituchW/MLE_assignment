@@ -53,6 +53,7 @@ def test_api_contract_fallback_metrics_and_validation(tmp_path: Path) -> None:
     assert known.status_code == 200
     assert known.json()["strategy"] == "personalized"
     assert len(known.json()["items"]) == 4
+    assert all("Because you watched" not in item["reason"] for item in known.json()["items"])
     unknown = client.post("/v1/recommendations", json={"user_id": "missing"})
     assert unknown.status_code == 200
     assert unknown.json()["strategy"] == "cold_start_popular"
@@ -64,7 +65,9 @@ def test_api_contract_fallback_metrics_and_validation(tmp_path: Path) -> None:
 def test_missing_bundle_is_not_ready(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
     assert client.get("/healthz").status_code == 200
-    assert client.get("/readyz").status_code == 503
+    readiness = client.get("/readyz")
+    assert readiness.status_code == 503
+    assert "error" not in readiness.json()["detail"]
     assert client.post("/v1/recommendations", json={"user_id": "A"}).status_code == 503
 
 
@@ -81,3 +84,6 @@ def test_hot_swap_and_failed_swap_keep_old_model(tmp_path: Path) -> None:
     write_pointer(pointer, "corrupt")
     assert client.get("/v1/model").json()["version"] == "v2"
     assert app.state.store.error is not None
+    first_error = app.state.store.error
+    assert client.get("/readyz").json()["model_version"] == "v2"
+    assert app.state.store.error == first_error

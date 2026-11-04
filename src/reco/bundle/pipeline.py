@@ -20,6 +20,7 @@ from reco.models.hybrid import HybridRecommender
 from reco.models.item_knn import ItemKNNRecommender
 from reco.models.popularity import PopularityRecommender
 from reco.models.training import TrainedModels, train_models
+from reco.serving.engine import RecommendationEngine
 
 
 def candidate_version(home: Path | None = None) -> str:
@@ -37,7 +38,12 @@ def train_bundle(cfg: Any, home: Path | None = None, version: str | None = None)
     interactions_path = paths["interactions"] / "interactions.parquet"
     catalog = pd.read_parquet(catalog_path)
     interactions = pd.read_parquet(interactions_path)
-    split = temporal_split(interactions, str(cfg.as_of_date), 14)
+    split = temporal_split(
+        interactions,
+        str(cfg.as_of_date),
+        int(cfg.evaluation.holdout_days),
+        int(cfg.evaluation.validation_days),
+    )
     timestamps = pd.to_datetime(interactions.event_ts, utc=True)
     pretest = interactions.loc[timestamps < split.test_start]
     trained = train_models(catalog, pretest, cfg)
@@ -51,13 +57,15 @@ def reconstruct(bundle: BundleData, cfg: Any) -> TrainedModels:
     pop_model = PopularityRecommender(bundle.popularity)
     knn_model = ItemKNNRecommender(bundle.similarity, bundle.history)
     content_model = ContentRecommender(bundle.embeddings, bundle.history)
-    weights = cfg.model.hybrid_weights
-    hybrid = HybridRecommender(
-        knn_model,
-        content_model,
-        pop_model,
-        (float(weights.item_knn), float(weights.content), float(weights.popularity)),
+    weights = bundle.manifest.get("serving", {}).get(
+        "hybrid_weights",
+        [
+            float(cfg.model.hybrid_weights.item_knn),
+            float(cfg.model.hybrid_weights.content),
+            float(cfg.model.hybrid_weights.popularity),
+        ],
     )
+    hybrid = HybridRecommender(knn_model, content_model, pop_model, tuple(float(w) for w in weights))
     return TrainedModels(
         catalog,
         bundle.item_ids,
@@ -77,16 +85,41 @@ def evaluate_bundle(cfg: Any, home: Path | None = None, version: str | None = No
     bundle_path = paths["models"] / selected_version
     bundle = load_bundle(bundle_path)
     interactions = pd.read_parquet(paths["interactions"] / "interactions.parquet")
-    split = temporal_split(interactions, str(cfg.as_of_date), 14)
-    metrics = evaluate_models(reconstruct(bundle, cfg), split.test, int(cfg.evaluation.max_users))
-    passed, reasons = evaluate_gate(metrics["hybrid"], metrics["popularity"])
+    split = temporal_split(
+        interactions,
+        str(cfg.as_of_date),
+        int(cfg.evaluation.holdout_days),
+        int(cfg.evaluation.validation_days),
+    )
+    k = int(cfg.evaluation.k)
+    if k != 10:
+        raise ValueError("This release supports only evaluation.k=10; metrics and gate are defined at @10")
+    diversity_fraction = float(bundle.manifest.get("serving", {}).get("diversity_fraction", 0.4))
+    metrics = evaluate_models(
+        reconstruct(bundle, cfg),
+        split.test,
+        int(cfg.evaluation.max_users),
+        k,
+        serving_engine=RecommendationEngine(bundle),
+        diversity_fraction=diversity_fraction,
+    )
+    baseline_ratio = float(cfg.evaluation.min_baseline_ratio)
+    champion_tolerance = float(cfg.evaluation.champion_tolerance)
+    passed, reasons = evaluate_gate(
+        metrics["hybrid"], metrics["popularity"], baseline_ratio=baseline_ratio
+    )
     report: dict[str, Any] = {
         "interaction_source": "simulated",
         "notice": (
             "Metrics recover simulator rules and are regression gates only; they do not estimate real-world quality."
         ),
         "models": metrics,
-        "promotion_gate": {"passed": passed, "reasons": reasons},
+        "promotion_gate": {
+            "passed": passed,
+            "reasons": reasons,
+            "baseline_ratio": baseline_ratio,
+            "champion_tolerance": champion_tolerance,
+        },
         "split": {
             "validation_start": split.validation_start.isoformat(),
             "test_start": split.test_start.isoformat(),

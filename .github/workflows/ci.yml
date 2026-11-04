@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install --use-feature=truststore -e '.[dev]'
+      - run: pip install -e '.[dev]'
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy src/reco
@@ -34,7 +34,7 @@ jobs:
               python -m reco train --config configs/ci.yaml --version fixture-ci
               python -m reco evaluate --config configs/ci.yaml --version fixture-ci
               # Small fixture metrics are not meaningful: force only for this CI smoke.
-              python -m reco promote --config configs/ci.yaml --version fixture-ci
+              python -m reco promote --config configs/ci.yaml --version fixture-ci --force
             '
 
           docker run -d --name netflix-reco-ci-api \

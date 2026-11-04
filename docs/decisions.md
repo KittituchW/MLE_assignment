@@ -20,9 +20,9 @@ misrepresent the data and fail the stated behavior requirement. Simulator metric
 
 **Decision.** Use sparse item-kNN as the behavioral component.
 
-**Why.** The supplied prototype found ALS within seed noise of item-kNN and below the hybrid. Item-kNN is small, fast,
-explainable, and avoids a compiled recommender dependency. ALS is reconsidered when real implicit-feedback volume and
-ranking gains justify it.
+**Why.** Item-kNN is small, fast, explainable, and avoids a compiled recommender dependency for this
+demonstration. No reproducible ALS comparison is included; an ALS baseline should be evaluated when real
+implicit-feedback volume and ranking gains justify the additional complexity.
 
 ## ADR-004: content model for reach, not accuracy
 
@@ -33,8 +33,9 @@ Torch add large dependencies without measured value here.
 
 ## ADR-005: 0.6/0.3/0.1 hybrid
 
-**Decision.** Per-request min-max normalization of item-kNN/content, blended with popularity at 0.6/0.3/0.1. These weights
-were selected on the validation window and frozen before the final 14-day test.
+**Decision.** Per-request min-max normalization of item-kNN/content, blended with popularity at 0.6/0.3/0.1.
+These are explicitly chosen demo weights, not the result of a reproducible hyperparameter search.
+The values are persisted in the serving manifest and checked with the same ranking rules used by the API.
 
 **Alternative.** A learned ranker requires trustworthy real exposures and negatives; simulator labels would teach its own
 rules more precisely without increasing evidence of user value.
@@ -58,7 +59,8 @@ explicitly not described as family-safe; production requires licensed maturity/r
 ## ADR-008: temporal evaluation and conservative gate
 
 **Decision.** Hold out the final 14 days, evaluate only new-to-user items, and promote only if Recall@10 and NDCG@10 are
-both at least 1.5x popularity and no more than 5% below the champion.
+both at least 1.5x popularity and no more than 5% below the champion. Evaluate the final ranked recommendations
+including history filtering, content fallback, deduplication, and diversity.
 
 **Why.** A random split leaks future behavior. Accuracy alone would hide catalogue collapse, so coverage and cold-item
 share are first-class report fields.
@@ -66,7 +68,7 @@ share are first-class report fields.
 ## ADR-009: deterministic clocks and runtime paths
 
 **Decision.** Dates come from config/arguments; pipeline logic never calls `datetime.now()`. Mutable files live under
-`RECO_HOME`, outside the repository/OneDrive when configured.
+`RECO_HOME`, outside the repository when configured.
 
 **Why.** This makes reruns byte-stable, tests reproducible, and packaging clean. The CI grep guard prevents regression.
 

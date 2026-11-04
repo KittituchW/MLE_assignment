@@ -79,6 +79,8 @@ def promote_bundle(
                 report["models"]["hybrid"],
                 report["models"]["popularity"],
                 champion_report["models"]["hybrid"],
+                baseline_ratio=float(report["promotion_gate"].get("baseline_ratio", 1.5)),
+                champion_tolerance=float(report["promotion_gate"].get("champion_tolerance", 0.05)),
             )
             if not passed:
                 reasons.extend(regression_reasons)

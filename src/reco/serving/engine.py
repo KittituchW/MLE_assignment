@@ -26,6 +26,11 @@ class RecommendationEngine:
     def __init__(self, bundle: BundleData) -> None:
         self.bundle = bundle
         self.user_index = {user_id: index for index, user_id in enumerate(bundle.user_ids)}
+        serving = bundle.manifest.get("serving", {})
+        self.weights = tuple(float(value) for value in serving.get("hybrid_weights", (0.6, 0.3, 0.1)))
+        if len(self.weights) != 3 or not np.isclose(sum(self.weights), 1.0):
+            raise ValueError("Bundle hybrid weights must contain three values summing to 1")
+        self.diversity_fraction = float(serving.get("diversity_fraction", 0.4))
 
     def _popularity(self) -> np.ndarray:
         return _minmax(self.bundle.popularity)
@@ -43,16 +48,18 @@ class RecommendationEngine:
     def _personalized(self, user_index: int) -> np.ndarray:
         history = self.bundle.history.getrow(user_index)
         item_scores = (history @ self.bundle.similarity).toarray().ravel().astype(np.float32)
-        return 0.6 * _minmax(item_scores) + 0.3 * _minmax(self._content(user_index)) + 0.1 * self._popularity()
+        item_weight, content_weight, popularity_weight = self.weights
+        return (
+            item_weight * _minmax(item_scores)
+            + content_weight * _minmax(self._content(user_index))
+            + popularity_weight * self._popularity()
+        ).astype(np.float32)
 
     def _reason(self, user_index: int | None, strategy: str) -> str:
+        """Do not disclose a user's watched titles through this unauthenticated demo API."""
         if user_index is None or strategy in {"cold_start_popular", "degraded_popular"}:
             return "Popular with viewers"
-        history = self.bundle.history.getrow(user_index)
-        if history.nnz == 0:
-            return "Similar to content in your profile"
-        watched_index = int(history.indices[int(np.argmax(history.data))])
-        return f"Because you watched {self.bundle.catalog[watched_index]['title']}"
+        return "Based on your viewing preferences"
 
     def recommend(
         self, user_id: str, limit: int = 10, content_type: str | None = None
@@ -77,7 +84,14 @@ class RecommendationEngine:
         except Exception:
             strategy = "degraded_popular"
             scores = self._popularity()
-        ranked = rank_items(scores, self.bundle.catalog, watched, limit, content_type)
+        ranked = rank_items(
+            scores,
+            self.bundle.catalog,
+            watched,
+            limit,
+            content_type,
+            diversity_fraction=self.diversity_fraction,
+        )
         normalized = _minmax(scores)
         reason = self._reason(user_index, strategy)
         items: list[dict[str, Any]] = []

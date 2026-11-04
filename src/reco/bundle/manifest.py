@@ -66,6 +66,14 @@ def make_manifest(
         "schema_version": SCHEMA_VERSION,
         "created_time": f"{cfg.build_date}T00:00:00Z",
         "interaction_source": "simulated",
+        "serving": {
+            "hybrid_weights": [
+                float(cfg.model.hybrid_weights.item_knn),
+                float(cfg.model.hybrid_weights.content),
+                float(cfg.model.hybrid_weights.popularity),
+            ],
+            "diversity_fraction": float(cfg.serving.diversity_fraction),
+        },
         "simulated_metrics_notice": (
             "Metrics measure recovery of deterministic simulator rules; they are regression gates, not real-world quality."
         ),
