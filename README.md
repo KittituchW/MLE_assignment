@@ -30,7 +30,7 @@ macOS/Linux:
 ```bash
 python3.12 -m venv /tmp/netflix-reco-venv
 . /tmp/netflix-reco-venv/bin/activate
-python -m pip install --use-feature=truststore -e '.[dev]'
+python -m pip install -e '.[dev]'
 export RECO_HOME="${RECO_HOME:-$PWD/var}"
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m reco run-all
@@ -111,8 +111,9 @@ The primary signal is item-kNN over watch-weighted behavior. A compact TF-IDF/SV
 events; it is included for catalogue reach, not because it wins offline accuracy. Popularity handles unknown users and
 degraded requests. The serving weights and diversity fraction are saved in the model manifest. Offline hybrid evaluation
 uses the same model selection, exclusion, deduplication, and diversity rules as the API; the gate should be assessed on
-the **served list**, not just an unrestricted score list. The API holds one read-only bundle in memory, fully validates a newly promoted bundle before swapping
-the reference, and keeps serving the previous version after a failed reload.
+the **served list**, not just an unrestricted score list. The API holds an immutable in-memory snapshot; pointer
+checks are throttled, and new bundles load outside the state lock so existing requests continue using the previous
+version. A failed reload keeps the last known-good snapshot.
 
 The API process never imports pandas, scikit-learn, or MLflow and never loads pickle. The MLflow registry wrapper may use
 CloudPickle internally, but serving reads only JSON, NPZ, and NPY.
@@ -127,14 +128,15 @@ curl -sS -X POST http://127.0.0.1:8000/v1/recommendations \
   -d '{"user_id":"A","limit":3}'
 ```
 
-Illustrative response structure (request IDs, model versions, rankings and scores vary with each run):
+Captured from the **full-data CI run on 2026-11-04** (commit `57a481a`, [workflow run #41793452268](https://github.com/KittituchW/MLE_assignment/actions/runs/41793452268)).
+Request IDs and source commit suffixes change between executions.
 
 ```json
 {
-  "request_id": "824b7beaa1c94e719c052dc565e030bc",
+  "request_id": "c4898f5001bb4b00a2bd6ec0c47ddf5a",
   "user_id": "A",
   "strategy": "personalized",
-  "model_version": "20261102-reviewed",
+  "model_version": "20261102-57a481a",
   "items": [
     {
       "rank": 1,
@@ -143,7 +145,7 @@ Illustrative response structure (request IDs, model versions, rankings and score
       "content_type": "movie",
       "genres": ["Action", "Adventure", "Thriller"],
       "release_year": 2022,
-      "score": 0.592537,
+      "score": 0.592786,
       "reason": "Based on your viewing preferences"
     },
     {
@@ -153,7 +155,7 @@ Illustrative response structure (request IDs, model versions, rankings and score
       "content_type": "movie",
       "genres": ["Action", "Adventure", "Fantasy"],
       "release_year": 2018,
-      "score": 0.569779,
+      "score": 0.57003,
       "reason": "Based on your viewing preferences"
     },
     {
@@ -163,7 +165,7 @@ Illustrative response structure (request IDs, model versions, rankings and score
       "content_type": "movie",
       "genres": ["Action", "Adventure", "Science Fiction"],
       "release_year": 2018,
-      "score": 0.551833,
+      "score": 0.551159,
       "reason": "Based on your viewing preferences"
     }
   ]
@@ -186,15 +188,25 @@ The demo response uses generic preference explanations rather than disclosing wa
 
 ## Evaluation and verification
 
-The source dataset has no real user interactions. Offline Recall@10, NDCG@10, catalogue coverage and cold-item share
-are measured on reproducibly simulated behavior, so these are **regression diagnostics**, not real-world effectiveness.
-Earlier results are deliberately not reproduced here: scoring and post-ranking rules were aligned after that run, and
-the old figures would no longer describe the current serving contract.
+**Measured full-data results** from [GitHub Actions run #41793452268](https://github.com/KittituchW/MLE_assignment/actions/runs/41793452268)
+on 2026-11-04. The pipeline used the pinned full 2025 catalogue, seed 42, 1,500 test users, and a final 14-day
+temporal holdout. **These metrics evaluate deterministic simulated interactions, not real-world user quality.**
+The hybrid row uses the same short-history fallback, filtering, deduplication, and diversity rules as serving.
 
-The CI workflow checks formatting, lint, types, tests, Docker image builds and a containerized training/API smoke test
-on the 300-item fixture. To validate full-data results after a fresh clone, run `python -m reco run-all`, followed by
-`pytest -m slow -rs`, and inspect the emitted `eval_report.json` under `RECO_HOME/artifacts/models`.
-The full-data training gate is meaningful only when it completes without `--force`.
+| Model | Recall@10 | NDCG@10 | Catalogue coverage | Cold-item share |
+|---|---:|---:|---:|---:|
+| Popularity | 0.0196 | 0.0125 | 0.07% | 0.00% |
+| Item-kNN | 0.0440 | 0.0342 | 6.25% | 0.00% |
+| Content | 0.0057 | 0.0027 | 7.39% | 61.14% |
+| **Hybrid** | **0.0479** | **0.0354** | **6.12%** | **0.37%** |
+
+The test window included 15,816 new-to-user events. The model passed its promotion gate **without** a forced
+override. The same run passed 35 tests (one full-data-dependent test skipped in the initial test stage), reached
+84.22% coverage, then ran the full-data acceptance test and a Dockerized fixture/API smoke test successfully.
+
+CI also prints a fresh evaluation table and real API example via `python scripts/report_evaluation.py` after each
+full-data acceptance run, avoiding stale hardcoded results. The checked-in results above are from the explicitly
+linked execution; future changes can legitimately produce different metrics.
 
 ## Tests and operational checks
 
@@ -210,6 +222,19 @@ python scripts/loadtest.py            # reports HTTP p50/p95/p99
 
 The committed test catalogue contains 300 real rows (150 per content type), including the real `show_id=18823`
 cross-file collision. Raw full data, runtime artifacts, databases, and virtual environments are not committed.
+
+## Submission packaging
+
+The assignment asks for a **whole Git repository**, not just a source-code snapshot. From a machine with Git,
+Python, and access to GitHub, run:
+
+```bash
+python scripts/package_submission.py
+```
+
+This clones the current `main` branch into a clean temporary directory, creates `MLE_assignment_submission.zip`,
+and verifies ZIP integrity and the included `MLE_assignment/.git/HEAD`. It preserves actual commit authors and
+history rather than rewriting provenance. A GitHub "Download ZIP" does **not** contain `.git`.
 
 ## Limitations
 
