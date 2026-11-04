@@ -1,4 +1,5 @@
 from pathlib import Path
+from threading import Event, Thread
 
 import numpy as np
 import pandas as pd
@@ -80,10 +81,75 @@ def test_hot_swap_and_failed_swap_keep_old_model(tmp_path: Path) -> None:
     client = TestClient(app)
     assert client.get("/v1/model").json()["version"] == "v1"
     write_pointer(pointer, "v2")
+    assert app.state.store.reload_if_changed(force=True)
     assert client.get("/v1/model").json()["version"] == "v2"
     write_pointer(pointer, "corrupt")
+    assert not app.state.store.reload_if_changed(force=True)
     assert client.get("/v1/model").json()["version"] == "v2"
     assert app.state.store.error is not None
     first_error = app.state.store.error
     assert client.get("/readyz").json()["model_version"] == "v2"
     assert app.state.store.error == first_error
+
+
+def test_slow_hot_swap_does_not_block_requests(tmp_path: Path, monkeypatch) -> None:
+    """Serving keeps the previous snapshot while another thread loads a model."""
+    import reco.serving.store as store_module
+
+    _bundle(tmp_path, "v1")
+    _bundle(tmp_path, "v2")
+    pointer = tmp_path / "artifacts" / "CHAMPION"
+    write_pointer(pointer, "v1")
+    app = create_app(tmp_path)
+    store = app.state.store
+    started = Event()
+    release = Event()
+    original_loader = store_module.load_bundle
+
+    def slow_loader(path: Path):
+        if Path(path).name == "v2":
+            started.set()
+            assert release.wait(timeout=5), "timed out waiting to finish bundle load"
+        return original_loader(path)
+
+    monkeypatch.setattr(store_module, "load_bundle", slow_loader)
+    write_pointer(pointer, "v2")
+    worker = Thread(target=lambda: store.reload_if_changed(force=True), daemon=True)
+    worker.start()
+    try:
+        assert started.wait(timeout=3), "replacement bundle load did not begin"
+        engine, version = store.snapshot()
+        assert engine is not None
+        assert version == "v1"
+        client = TestClient(app)
+        response = client.post("/v1/recommendations", json={"user_id": "A", "limit": 3})
+        assert response.status_code == 200
+        assert response.json()["model_version"] == "v1"
+    finally:
+        release.set()
+        worker.join(timeout=3)
+    assert not worker.is_alive()
+    assert store.snapshot()[1] == "v2"
+
+
+def test_pointer_polling_skips_repeated_reads(tmp_path: Path, monkeypatch) -> None:
+    """Normal requests do not re-read the pointer at request frequency."""
+    _bundle(tmp_path, "v1")
+    pointer = tmp_path / "artifacts" / "CHAMPION"
+    write_pointer(pointer, "v1")
+    app = create_app(tmp_path)
+    store = app.state.store
+    reads = 0
+    original_read = Path.read_text
+
+    def spy_read(path: Path, *args, **kwargs):
+        nonlocal reads
+        if path == pointer:
+            reads += 1
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", spy_read)
+    for _ in range(20):
+        store.reload_if_changed()
+    assert reads == 0
+    assert store.snapshot()[1] == "v1"
