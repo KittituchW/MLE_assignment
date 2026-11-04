@@ -24,6 +24,7 @@ jobs:
         run: |
           python -m reco run-all
           pytest -m slow -rs
+          python scripts/report_evaluation.py
       - name: Dockerized fixture pipeline and API smoke test
         run: |
           set -euo pipefail
