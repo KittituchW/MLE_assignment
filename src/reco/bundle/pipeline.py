@@ -105,9 +105,7 @@ def evaluate_bundle(cfg: Any, home: Path | None = None, version: str | None = No
     )
     baseline_ratio = float(cfg.evaluation.min_baseline_ratio)
     champion_tolerance = float(cfg.evaluation.champion_tolerance)
-    passed, reasons = evaluate_gate(
-        metrics["hybrid"], metrics["popularity"], baseline_ratio=baseline_ratio
-    )
+    passed, reasons = evaluate_gate(metrics["hybrid"], metrics["popularity"], baseline_ratio=baseline_ratio)
     report: dict[str, Any] = {
         "interaction_source": "simulated",
         "notice": (
